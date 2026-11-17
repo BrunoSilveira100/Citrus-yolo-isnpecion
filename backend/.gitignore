@@ -1,0 +1,27 @@
+# ambiente (fica dentro de backend/)
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# pesos (yolov8n.pt e best.pt) e execuções do Ultralytics
+*.pt
+runs/
+
+# dados (pesados; vão no ZIP de entrega, não no git)
+dataset/bruto/*
+dataset/ineditas/*
+dataset/images/
+dataset/labels/
+dataset/_download/
+dataset/data.yaml
+!dataset/**/.gitkeep
+!modelo/.gitkeep
+
+# gerados
+resultados/*
+!resultados/prints/
+resultados/prints/*
+!resultados/prints/.gitkeep
+entrega/

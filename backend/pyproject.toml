@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "citrus-yolo-inspection"
+version = "1.0.0"
+description = "Treino e inspeção de laranjas (boa x defeito) com YOLO — Atividade Prática Final de IA."
+requires-python = ">=3.10"
+authors = [{ name = "Bruno Silveira" }]
+dependencies = [
+  "ultralytics>=8.3",
+  "numpy>=1.26",
+  "opencv-python>=4.9",
+  "pyyaml>=6.0",
+  "typer>=0.12",
+  "rich>=13",
+  "reportlab>=4.0",
+]
+
+[project.optional-dependencies]
+roboflow = ["roboflow>=1.1"]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+citrus-yolo = "citrus_yolo.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/citrus_yolo/cli.py" = ["B008"]

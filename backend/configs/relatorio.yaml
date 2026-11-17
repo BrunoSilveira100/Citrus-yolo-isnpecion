@@ -1,0 +1,80 @@
+# Textos pessoais do relatório. Os números (imagens, épocas, métricas, detecções) NÃO ficam aqui:
+# eles são lidos dos arquivos gerados em resultados/. Aqui vai só o que precisa da sua voz.
+#
+# Os textos abaixo foram redigidos com apoio de IA a partir dos resultados reais do treino.
+# O enunciado pede as respostas "com suas próprias palavras": leia, ajuste o que não soar como você
+# e confira se concorda com cada afirmação antes de entregar.
+# Se marcar algum trecho com "EDITE:", o `citrus-yolo entregar` lista como pendência.
+
+questao1: |
+  Escolhi detectar laranjas e separar as saudáveis das que têm doença visível na casca. É um
+  problema real: doenças como mancha preta, cancro cítrico, greening e verrugose derrubam o valor
+  da fruta, e a triagem ainda é feita no olho em muitos lugares. Um modelo que marca cada laranja
+  e diz se ela está boa ou com defeito ajuda a padronizar essa separação. Também é um tema em que
+  a diferença entre as classes aparece na imagem, o que combina com um modelo pequeno treinado
+  com poucas centenas de fotos.
+
+obtencao_imagens: |
+  Usei um dataset público: o Orange Fruit Diseases Dataset (Doh, 2025), do Mendeley Data, com
+  licença CC BY 4.0. Ele tem 700 fotos separadas em pastas por diagnóstico: healthy, Black spot,
+  Canker, Greening e Scab. Juntei as quatro doenças na classe laranja_defeito e deixei healthy
+  como laranja_boa.
+
+  O arquivo baixado não trazia as caixas, só as fotos por pasta. Então fiz uma anotação
+  semi-automática (scripts/anotar_mendeley.py): o YOLOv8n pré-treinado no COCO propôs a caixa da
+  fruta e, nas fotos de fundo liso em que ele falhou, usei uma segmentação simples por cor. A
+  classe veio da pasta, ou seja, do diagnóstico dos autores do dataset. Só mantive as fotos com
+  uma única fruta (em foto de árvore com várias laranjas, o rótulo da pasta não vale para cada
+  uma), tirei 156 quase-duplicatas (o dataset tinha muitas cópias giradas da mesma foto) e conferi
+  as caixas visualmente por amostragem. No fim ficaram 240 imagens equilibradas (120 de cada
+  classe) para treino e validação, e 8 imagens separadas como inéditas, com gabarito.
+
+# Se o ZIP ficar grande demais e o dataset for por link, coloque aqui (aparece no relatório).
+link_dataset: "https://doi.org/10.17632/6szsnpypdd.1"
+
+explicacao_metricas:
+  precision: |
+    É a pergunta "quando o modelo aponta, ele acerta?". De todas as caixas que ele desenhou, mede
+    quantas estavam certas. Deu 0,899 no geral. Na classe laranja_boa foi a mais baixa (0,839),
+    ou seja, às vezes o modelo chama de boa uma fruta que não é. Para inspeção isso é o erro mais
+    caro, porque é a laranja doente passando como saudável.
+  recall: |
+    É a pergunta "das laranjas que estavam lá, quantas ele achou?". Deu 0,978: na validação quase
+    nenhuma fruta passou sem caixa. Na laranja_boa chegou a 1,0.
+  mAP50: |
+    É uma nota geral de 0 a 1 que junta precision e recall em todos os níveis de confiança.
+    Conta como acerto quando a caixa prevista cobre pelo menos metade da caixa real (IoU de 0,5).
+    O modelo tirou 0,986, que é alto. Mas, como explico na questão 6, esse número está otimista.
+  mAP50_95: |
+    É a mesma nota com régua mais exigente: faz a média com IoU de 0,50 até 0,95, então mede se a
+    caixa está bem encaixada na fruta, e não só "mais ou menos no lugar". Deu 0,904, um pouco abaixo
+    do mAP50, o que mostra que as caixas ficaram bem ajustadas na maior parte das vezes.
+
+comentario_ineditas: |
+  Nas 8 imagens inéditas, 5 saíram perfeitas: as 3 laranjas saudáveis com fundo branco e as frutas
+  com mancha preta e greening, todas com confiança acima de 0,87. Os 3 erros ensinam mais que os
+  acertos. Na foto de cancro (Canker 45) o modelo desenhou duas caixas na mesma fruta, uma de "boa"
+  (0,67) e outra de "defeito" (0,55): ele ficou em dúvida, e o cancro só tinha 26 fotos somando treino e validação.
+  Na de verrugose (Scab 109) ele chamou a fruta de boa com 0,75, e essa doença praticamente não
+  entrou no dataset (só 4 fotos somando treino e validação). Na saudável Healthy 61 ele não achou nada: a foto está girada
+  45 graus, com uma folha seca por cima e a fruta cortada nas bordas, um caso bem diferente do resto.
+
+dificuldades: |
+  A maior dificuldade foi o próprio dataset. O arquivo público não trazia as caixas, então tive que
+  montar uma anotação semi-automática e conferir por amostragem. Muitas fotos eram de árvore com
+  várias laranjas, em que o rótulo da pasta não vale para cada fruta, e tive que descartá-las. O
+  dataset também tinha muitas cópias giradas da mesma foto: tirei 156 quase-duplicatas, mas o hash
+  que usei não pega rotação. Por isso a validação deu mAP50 de 0,986 e nas inéditas o modelo
+  acertou 5 de 8: provavelmente há versões giradas da mesma foto no treino e na validação, o que
+  deixa a validação otimista. As inéditas são o teste mais honesto do trabalho. Outro ponto é o
+  fundo: as fotos saudáveis são quase todas de estúdio, com fundo branco, e as doentes têm mais fundo
+  cinza ou escuro, então o modelo pode estar usando o fundo como pista. Por fim, o treino de 30
+  épocas levou 27 minutos na CPU.
+
+melhorias: |
+  Primeiro, equilibrar as doenças dentro da classe defeito: a verrugose quase não entrou, e foi
+  exatamente onde o modelo errou. Segundo, remover duplicatas também por rotação, ou separar treino
+  e validação por foto de origem, para a validação ficar confiável. Terceiro, fotografar laranjas
+  reais em vários fundos e luzes, para o modelo não aprender o fundo. Também valeria anotar as
+  caixas à mão numa ferramenta como o Roboflow, dividir "defeito" em tipos de doença e, com GPU,
+  testar um modelo maior (yolov8s) e mais épocas.

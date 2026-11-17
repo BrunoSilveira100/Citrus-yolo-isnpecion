@@ -1,0 +1,52 @@
+# Configuração central do projeto. Caminhos relativos são resolvidos a partir da raiz do projeto
+# (a pasta que contém configs/), então dá para rodar a CLI de qualquer subpasta.
+
+aluno:
+  nome: "Bruno Henrique da Silveira"
+  curso: ""            # preencha: ex. "Análise e Desenvolvimento de Sistemas"
+  instituicao: ""
+  disciplina: "Inteligência Artificial"
+  professor: ""
+
+projeto:
+  titulo: "Inspeção de laranjas com YOLO"
+  descricao: >-
+    Detector de laranjas que localiza cada fruta com uma caixa delimitadora e diz se ela está boa
+    ou com defeito (mancha, podridão ou bolor). A ideia vem da inspeção visual em esteira: em vez de
+    uma pessoa olhar fruta por fruta, a câmera aponta quais precisam ser separadas.
+
+# A ordem importa: o índice de cada nome é o número da classe nos arquivos .txt.
+# Use só letras, números e "_" (sem espaço nem acento).
+classes:
+  - laranja_boa
+  - laranja_defeito
+
+caminhos:
+  bruto: dataset/bruto           # fotos (images/) + rótulos (labels/) exportados da ferramenta de anotação
+  dataset: dataset               # aqui são gerados images/, labels/ e data.yaml
+  ineditas: dataset/ineditas     # 5+ fotos que NUNCA entram no treino nem na validação
+  modelo: modelo                 # cópia do best.pt
+  resultados: resultados
+  runs: runs/detect              # pasta onde o Ultralytics grava cada execução
+  entrega: entrega               # onde o ZIP final é montado
+
+divisao:
+  proporcao_val: 0.2             # ~80% treino / ~20% validação
+  semente: 42                    # mesma semente = mesma divisão (reprodutível)
+  minimo_imagens: 60
+  minimo_ineditas: 5
+
+treino:
+  modelo_base: yolov8n.pt        # modelo leve com pesos pré-treinados no COCO
+  epocas: 30
+  imgsz: 640
+  batch: 4
+  dispositivo: cpu               # "cpu" ou "0" para a primeira GPU (Colab, por exemplo)
+  paciencia: 50                  # early stopping: para se o mAP não melhorar por N épocas
+  nome_execucao: train
+  justificativa_epocas: ""       # obrigatório se epocas < 20 (a atividade exige justificar)
+
+deteccao:
+  confianca: 0.25
+  iou: 0.7
+  classe_defeito: laranja_defeito   # usada no painel para calcular a taxa de defeito

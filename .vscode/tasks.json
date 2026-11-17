@@ -1,0 +1,18 @@
+{
+  "version": "2.0.0",
+  "options": { "cwd": "${workspaceFolder}/backend" },
+  "inputs": [
+    { "id": "pasta", "type": "promptString", "description": "Pasta do export YOLO (Roboflow/CVAT/LabelImg)" }
+  ],
+  "tasks": [
+    { "label": "0. yolo checks", "type": "shell", "command": ".venv/Scripts/yolo checks", "problemMatcher": [] },
+    { "label": "1a. importar export YOLO", "type": "shell", "command": ".venv/Scripts/citrus-yolo importar \"${input:pasta}\"", "problemMatcher": [] },
+    { "label": "1. preparar dataset", "type": "shell", "command": ".venv/Scripts/citrus-yolo preparar", "problemMatcher": [] },
+    { "label": "2. treinar", "type": "shell", "command": ".venv/Scripts/citrus-yolo treinar", "problemMatcher": [] },
+    { "label": "3. validar", "type": "shell", "command": ".venv/Scripts/citrus-yolo validar", "problemMatcher": [] },
+    { "label": "4. detectar inéditas", "type": "shell", "command": ".venv/Scripts/citrus-yolo detectar", "problemMatcher": [] },
+    { "label": "5. relatório", "type": "shell", "command": ".venv/Scripts/citrus-yolo relatorio", "problemMatcher": [] },
+    { "label": "6. entregar (ZIP)", "type": "shell", "command": ".venv/Scripts/citrus-yolo entregar", "problemMatcher": [] },
+    { "label": "testes (ruff + pytest)", "type": "shell", "command": ".venv/Scripts/python -m ruff check . ; .venv/Scripts/python -m pytest", "group": { "kind": "test", "isDefault": true }, "problemMatcher": [] }
+  ]
+}

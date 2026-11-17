@@ -1,0 +1,13 @@
+# Mesmas dependências do pyproject.toml, para quem preferir `pip install -r requirements.txt`.
+# O jeito recomendado continua sendo: pip install -e ".[dev]"
+ultralytics>=8.3
+numpy>=1.26
+opencv-python>=4.9
+pyyaml>=6.0
+typer>=0.12
+rich>=13
+reportlab>=4.0
+pytest>=8
+ruff>=0.5
+# opcional, só para baixar dataset do Roboflow pela CLI:
+# roboflow>=1.1

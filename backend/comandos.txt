@@ -1,0 +1,89 @@
+COMANDOS DO PROJETO — Inspeção de laranjas com YOLO
+====================================================
+
+Este arquivo tem duas partes:
+  1) os comandos de referência (este texto);
+  2) no ZIP de entrega, logo abaixo, o LOG AUTOMÁTICO com os comandos que foram realmente
+     executados, com data e hora (gerado pelo `citrus-yolo entregar`).
+
+------------------------------------------------------------------
+1. Ambiente
+------------------------------------------------------------------
+# Windows (PowerShell)
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -U pip
+pip install -e ".[dev]"
+yolo checks
+
+# Linux / macOS
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -e ".[dev]"
+yolo checks
+
+------------------------------------------------------------------
+2. Dataset
+------------------------------------------------------------------
+# >>> USADO NESTE TRABALHO: Orange Fruit Diseases Dataset (Mendeley, CC BY 4.0)
+# Download: https://doi.org/10.17632/6szsnpypdd.1  (ZIP sem caixas -> anotação semi-automática)
+python scripts/anotar_mendeley.py "<pasta extraída>/Orange Fruit Diseases"
+citrus-yolo preparar
+
+# Opção A: dataset público exportado do Roboflow (formato YOLOv8), já descompactado
+citrus-yolo importar C:/Downloads/meu-export-roboflow
+
+# Opção A (pela API): defina a chave e baixe direto
+#   PowerShell:  $env:ROBOFLOW_API_KEY="sua_chave"
+#   Linux:       export ROBOFLOW_API_KEY=sua_chave
+pip install -e ".[roboflow]"
+citrus-yolo baixar-roboflow <workspace> <projeto> <versao>
+
+# Opção B: fotos próprias -> dataset/bruto/images  e  .txt -> dataset/bruto/labels
+
+# Divisão 80/20 + data.yaml + checagens
+citrus-yolo preparar
+
+------------------------------------------------------------------
+3. Treino, validação e detecção (CLI do projeto)
+------------------------------------------------------------------
+citrus-yolo treinar                  # yolov8n.pt, 30 épocas, imgsz 640, batch 4 (configs/projeto.yaml)
+citrus-yolo treinar --dispositivo 0  # com GPU
+citrus-yolo validar
+citrus-yolo detectar                 # usa dataset/ineditas, conf 0.25
+citrus-yolo relatorio
+citrus-yolo entregar
+
+# ou tudo de uma vez:
+citrus-yolo tudo
+
+------------------------------------------------------------------
+4. Equivalentes diretos na CLI do Ultralytics (os do enunciado)
+------------------------------------------------------------------
+# Rode da raiz do projeto. O `project=` precisa ser um caminho ABSOLUTO: se for relativo (ou
+# omitido), o Ultralytics 8.4 grava dentro do runs_dir global (veja com `yolo settings`), que pode
+# ficar fora do projeto. Aí o val/predict não acham o best.pt.
+
+# PowerShell
+yolo detect train model=yolov8n.pt data="dataset/data.yaml" epochs=30 imgsz=640 batch=4 project="$PWD/runs/detect" name=train
+yolo detect val model="runs/detect/train/weights/best.pt" data="dataset/data.yaml" project="$PWD/runs/detect" name=val
+yolo detect predict model="runs/detect/train/weights/best.pt" source="dataset/ineditas" conf=0.25 save=True project="$PWD/runs/detect" name=predict
+
+# Linux / macOS / Colab: troque "$PWD/runs/detect" por "$(pwd)/runs/detect"
+
+Obs.: se runs/detect/train já existir, o Ultralytics cria train2, train3... Ajuste o caminho do
+best.pt no val/predict. O `citrus-yolo treinar` resolve isso sozinho: copia o best.pt da execução
+atual para modelo/best.pt, que é o arquivo entregue.
+
+------------------------------------------------------------------
+5. Teste do pipeline com dados sintéticos (NÃO usar na entrega)
+------------------------------------------------------------------
+citrus-yolo sintetico
+citrus-yolo preparar
+citrus-yolo treinar --epocas 3 --imgsz 320 --justificativa "teste rápido do pipeline"
+citrus-yolo validar
+citrus-yolo detectar
+citrus-yolo relatorio
+citrus-yolo entregar
+citrus-yolo sintetico --limpar
