@@ -4,20 +4,11 @@ Inspeção visual de laranjas com visão computacional para apoiar a **seleção
 citros**: o sistema detecta cada fruta, separa as boas das que têm doença na casca e transforma o
 resultado em indicadores de qualidade por lote. Desenvolvido por Bruno Henrique da Silveira.
 
-![Referência visual: dashboard de inspeção de citros em esteira](frontend/docs/imagens/referencia_inspecao_esteira.jpg)
-
-<sub>**Referência visual da visão de futuro (fase 3 do roadmap). Esta imagem não foi gerada por este
-projeto.** É o dashboard de inspeção em esteira do
-[citrus-inspection-vision](https://github.com/francisco-cst-oliveira/citrus-inspection-vision), de
-Francisco Oliveira (modelo PatchCore, vídeo de Thiago Zanutim Lucas via Pexels). Ela mostra aonde
-esta solução pode chegar na linha de beneficiamento.</sub>
-
-**Resultado deste projeto:** painéis de inspeção gerados pelo sistema em imagens que o modelo nunca viu.
-
 ![Painel de inspeção gerado pelo sistema em imagens inéditas](frontend/docs/imagens/painel_inspecao.jpg)
 
-<sub>Três acertos e um erro real: a fruta com verrugose (embaixo, à direita) foi aprovada como boa.
-É esse tipo de caso que a análise de negócio abaixo trata.</sub>
+<sub>Painéis gerados pelo próprio sistema em imagens que o modelo nunca viu. Três acertos e um erro
+real: a fruta com verrugose (embaixo, à direita) foi aprovada como boa. É esse tipo de caso que a
+análise de negócio abaixo trata.</sub>
 
 ## O que está neste repositório
 
