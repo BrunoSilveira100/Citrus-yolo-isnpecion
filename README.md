@@ -1,242 +1,174 @@
 # Citrus YOLO Inspection
 
-Inspeção visual de laranjas com visão computacional para apoiar a **seleção no beneficiamento de
-citros**: o sistema detecta cada fruta, separa as boas das que têm doença na casca e transforma o
-resultado em indicadores de qualidade por lote. Desenvolvido por Bruno Henrique da Silveira.
+Visão computacional para separar laranjas boas das doentes no **beneficiamento de citros**. O sistema
+encontra cada fruta na imagem, diz se ela está boa ou com defeito e transforma isso em indicadores do
+lote. Desenvolvido por Bruno Henrique da Silveira.
 
-![Painel de inspeção gerado pelo sistema em imagens inéditas](frontend/docs/imagens/painel_inspecao.jpg)
+![Simulação da inspeção na linha de beneficiamento](frontend/docs/imagens/fluxo_simulado.jpg)
 
-<sub>Painéis gerados pelo próprio sistema em imagens que o modelo nunca viu. Três acertos e um erro
-real: a fruta com verrugose (embaixo, à direita) foi aprovada como boa. É esse tipo de caso que a
-análise de negócio abaixo trata.</sub>
+<sub>Simulação da fase 3 do roadmap. A câmera e a esteira são desenho; as frutas são fotos reais e cada
+classificação foi feita pelo modelo treinado neste projeto.</sub>
 
-## O que está neste repositório
+## Por que este projeto existe
 
-- detecção e classificação de laranjas (`laranja_boa` × `laranja_defeito`) com YOLOv8;
-- pipeline completo: preparo dos dados → treino → validação → teste em imagens inéditas → relatório;
-- painel de inspeção por imagem, com contagem por classe, taxa de defeito e confiança;
-- 22 regras de negócio para qualidade de dados, decisão e rastreabilidade;
-- conferência automática de acerto e erro, separando classe trocada, falso positivo e fruta não detectada;
-- relatório gerado só com números reais, sem digitação manual;
-- 38 testes automatizados e CI no GitHub Actions.
+Na seleção da laranja, ainda é comum alguém olhar fruta por fruta na esteira. É um trabalho cansativo,
+o critério muda de um turno para outro e quase nada fica registrado. Quando uma fruta doente passa
+como boa, o problema chega ao cliente.
 
-## Contexto de negócio
+A proposta é simples: uma câmera olha cada fruta, o modelo decide e o lote ganha números. A fruta boa
+segue para a embalagem, a doente vai para o descarte, e o caso duvidoso vai para uma pessoa revisar.
 
-No beneficiamento, a laranja é lavada, selecionada, classificada e embalada. A **seleção visual**
-ainda depende de pessoas olhando fruta por fruta na esteira.
-
-| Dor da operação | Impacto | Resposta do sistema |
-| --- | --- | --- |
-| Inspeção 100% manual | Custo de mão de obra e gargalo de vazão | Detecção automática de cada fruta |
-| Critério subjetivo | Classificação diferente por turno ou operador | Mesmo critério aplicado a todas as imagens |
-| Fadiga ao longo do turno | Mais fruta doente passando no fim do expediente | Desempenho constante, sem cansaço |
-| Falta de registro | Sem histórico de qualidade por lote ou produtor | Taxa de defeito e log de cada execução |
-| Fruta doente no lote bom | Reclamação, devolução e risco na exportação | Classe e confiança por fruta, com casos de dúvida sinalizados |
-
-**Objetivo da prova de conceito:** mostrar que um modelo leve, treinado com poucas centenas de
-imagens, consegue apontar a fruta com defeito de forma padronizada e rastreável, criando a base
-técnica e de processo para um piloto na linha.
-
-## Arquitetura
+## Como funciona
 
 ```mermaid
 flowchart LR
     A[Imagens] --> B[Controle de qualidade<br/>dos dados]
-    B --> C[Divisão treino / validação<br/>sem vazamento]
-    C --> D[Treino YOLOv8n]
-    D --> E[Validação<br/>Precision · Recall · mAP]
-    E --> F[Teste em imagens inéditas<br/>acerto / erro]
-    F --> G[Painel e indicadores<br/>do lote]
-    G --> H[Relatório e entrega<br/>rastreáveis]
+    B --> C[Treino<br/>YOLOv8n]
+    C --> D[Validação]
+    D --> E[Teste em imagens<br/>nunca vistas]
+    E --> F[Painel e relatório]
 ```
 
-O sistema separa o **backend** (pipeline Python: dados, treino, avaliação e regras) do **frontend**
-(o que as pessoas leem e usam: apresentação, notebook e documentação). Cada etapa grava o que
-produziu, e a seguinte lê desses arquivos, então nenhum indicador é digitado à mão.
-
-Visão de futuro para a linha de beneficiamento:
-
-```mermaid
-flowchart LR
-    A[Fruta na esteira] --> B[Câmera]
-    B --> C[Detecção e classificação]
-    C -->|boa, confiança ≥ 0,50| D[Embalagem]
-    C -->|defeito| E[Descarte]
-    C -->|confiança < 0,50| F[Revisão humana]
-    C --> G[Painel do lote]
-```
+Cada etapa é um comando e grava o que produziu. A etapa seguinte lê desses arquivos, então nenhum
+número do relatório é digitado à mão.
 
 ## Regras de negócio
 
-Todas as regras estão implementadas e cobertas por testes. Os parâmetros ficam em
-[`backend/configs/projeto.yaml`](backend/configs/projeto.yaml), então dá para ajustar o critério sem
-mexer no código.
+As decisões seguem regras claras, e os parâmetros ficam em
+[`backend/configs/projeto.yaml`](backend/configs/projeto.yaml). Hoje o sistema aplica essas regras na
+avaliação e no relatório; na linha (fase 3), elas definem o destino de cada fruta, como na simulação.
 
-**Classificação e decisão**
+- **Embalagem:** fruta classificada como boa, com confiança de pelo menos 0,50.
+- **Descarte:** fruta classificada com defeito.
+- **Revisão humana:** qualquer fruta com confiança abaixo de 0,50 (hoje sinalizada no relatório).
+- **Taxa de defeito do lote:** frutas com defeito ÷ total inspecionado.
+- **Dados confiáveis:** anotação fora do padrão, imagem duplicada ou "inédita" copiada do treino são barradas antes do treino.
+- **Rastreabilidade:** cada comando fica registrado com data e hora.
 
-| ID | Regra | Parâmetro |
+<details>
+<summary><b>Ver as 22 regras completas</b></summary>
+
+| ID | Regra | Efeito |
 | --- | --- | --- |
-| RN-01 | Toda fruta detectada recebe uma classe da lista configurada (mínimo de 2 classes) | `classes` |
-| RN-02 | A classe de descarte é definida em configuração e alimenta a taxa de defeito | `deteccao.classe_defeito` |
-| RN-03 | Só é registrada a detecção com confiança ≥ 0,25 | `deteccao.confianca` |
-| RN-04 | Confiança < 0,50 é sinalizada como caso de dúvida, candidato a revisão humana | relatório |
-| RN-05 | Taxa de defeito = frutas com defeito ÷ total de frutas detectadas | painel |
-| RN-06 | Acerto só quando a caixa cobre ≥ 50% da fruta real (IoU ≥ 0,5) **e** a classe está correta | detecção |
-| RN-07 | Todo erro é classificado: classe trocada, falso positivo ou fruta não detectada | detecção |
-
-**Qualidade dos dados**
-
-| ID | Regra | Comportamento |
-| --- | --- | --- |
-| RN-08 | Anotação com 5 valores, classe válida e coordenadas normalizadas entre 0 e 1 | Bloqueia e aponta arquivo e linha |
-| RN-09 | Anotação em polígono não é aceita como caixa | Bloqueia |
-| RN-10 | Imagem sem anotação impede o preparo | Bloqueia |
-| RN-11 | Imagens idênticas (mesmo hash) são descartadas | Descarta e avisa |
-| RN-12 | Mínimo de 60 imagens anotadas | Bloqueia (exceção explícita com `--forcar`) |
-| RN-13 | Mínimo de 5 imagens inéditas para o teste final | Alerta e pendência na entrega |
-| RN-14 | Classe menor com menos de 50% das caixas da maior: dataset desbalanceado | Alerta |
+| RN-01 | Toda fruta recebe uma das classes configuradas (mínimo 2) | Classificação |
+| RN-02 | A classe de descarte é definida em configuração | Taxa de defeito |
+| RN-03 | Detecção só é registrada com confiança ≥ 0,25 | Filtro |
+| RN-04 | Confiança < 0,50 vira caso de dúvida | Revisão humana |
+| RN-05 | Taxa de defeito = defeitos ÷ total do lote | Painel |
+| RN-06 | Acerto exige caixa com IoU ≥ 0,5 **e** classe correta | Avaliação |
+| RN-07 | Erro é separado em classe trocada, falso positivo ou não detectada | Avaliação |
+| RN-08 | Anotação: 5 valores, classe válida, coordenadas de 0 a 1 | Bloqueia |
+| RN-09 | Anotação em polígono não vale como caixa | Bloqueia |
+| RN-10 | Imagem sem anotação | Bloqueia |
+| RN-11 | Imagens idênticas (mesmo hash) | Descarta |
+| RN-12 | Mínimo de 60 imagens anotadas | Bloqueia |
+| RN-13 | Mínimo de 5 imagens inéditas | Alerta |
+| RN-14 | Classe menor com menos de 50% da maior | Alerta |
 | RN-15 | Classe sem nenhuma anotação | Alerta |
+| RN-16 | Divisão ~80/20 estratificada, com semente fixa | Automático |
+| RN-17 | Cópias da mesma foto ficam do mesmo lado da divisão | Automático |
+| RN-18 | Imagem inédita não pode ser cópia do treino | Bloqueia |
+| RN-19 | Menos de 20 épocas exige justificativa | Bloqueia |
+| RN-20 | Todo comando é registrado com data e hora | Log |
+| RN-21 | Indicador sem dado aparece como PENDENTE, nunca estimado | Relatório |
+| RN-22 | Dados sintéticos de teste nunca vão para a entrega | Alerta |
 
-**Confiabilidade da avaliação e governança**
+</details>
 
-| ID | Regra | Comportamento |
-| --- | --- | --- |
-| RN-16 | Divisão ~80/20 estratificada por classe, com semente fixa (reprodutível) | Automático |
-| RN-17 | Cópias aumentadas da mesma foto de origem ficam do mesmo lado da divisão | Automático |
-| RN-18 | Imagem "inédita" não pode ser cópia de imagem de treino ou validação | Bloqueia |
-| RN-19 | Treino com menos de 20 épocas exige justificativa | Bloqueia sem justificativa |
-| RN-20 | Todo comando é registrado com data, hora e o equivalente do Ultralytics | Log automático |
-| RN-21 | Indicador sem dado de origem aparece como **PENDENTE**, nunca estimado | Relatório |
-| RN-22 | Dados sintéticos de teste nunca vão para a entrega | Alerta em vermelho |
+## Resultados
 
-## Indicadores
+Modelo YOLOv8n treinado por 30 épocas com 240 fotos reais (120 boas e 120 com defeito).
 
-Resultados do modelo treinado (YOLOv8n, 30 épocas, 192 imagens de treino e 48 de validação):
-
-| Classe | Precision | Recall | mAP50 | mAP50-95 |
+| | Precision | Recall | mAP50 | mAP50-95 |
 | --- | ---: | ---: | ---: | ---: |
 | **Geral** | 0,899 | 0,978 | 0,986 | 0,904 |
-| laranja_boa | 0,839 | 1,000 | 0,990 | 0,904 |
-| laranja_defeito | 0,958 | 0,957 | 0,982 | 0,904 |
+| Laranja boa | 0,839 | 1,000 | 0,990 | 0,904 |
+| Laranja com defeito | 0,958 | 0,957 | 0,982 | 0,904 |
 
-Em **8 imagens inéditas**, 5 saíram sem nenhum erro.
+O que esses números dizem:
 
-| Métrica | Pergunta de negócio | Leitura deste resultado |
-| --- | --- | --- |
-| Recall | Das frutas presentes, quantas o sistema encontra? | 0,978: quase nenhuma fruta escapa |
-| Precision da classe boa | Quando o sistema aprova, a fruta é mesmo boa? | 0,839: é o ponto de atenção, porque aprovar fruta doente é o erro mais caro |
-| Precision da classe defeito | Quando o sistema descarta, a fruta é mesmo doente? | 0,958: pouco descarte de fruta boa |
-| mAP50-95 | As caixas estão bem posicionadas? | 0,904: base sólida para contagem |
+- **Quase nenhuma fruta escapa** (recall de 0,978).
+- **O ponto fraco é aprovar fruta doente como boa** (precision de 0,839 na classe boa), que é o erro mais caro na linha.
+- **Em 8 fotos que o modelo nunca viu, acertou 5 sem nenhum erro.** Os erros vieram de doenças com poucos exemplos e de uma foto fora do padrão.
+- **A validação está otimista.** O dataset tem cópias giradas da mesma foto, então o teste nas fotos inéditas é o retrato mais fiel.
 
-**A validação está otimista.** O dataset público tem cópias giradas da mesma foto, que a remoção de
-duplicatas não detecta. O resultado nas imagens inéditas (5 de 8) é o retrato mais fiel do
-desempenho real. Os números representam uma prova de conceito controlada e não substituem a
-validação na linha de produção.
+![Painéis de inspeção em fotos que o modelo nunca viu](frontend/docs/imagens/painel_inspecao.jpg)
 
-## Evidências
+<sub>Resultado real do sistema: três acertos e um erro. A fruta com verrugose (embaixo, à direita) foi aprovada como boa.</sub>
 
-**Dataset anotado.** Exemplos de imagens de treino com as caixas de cada classe.
+<details>
+<summary><b>Mais evidências: dataset, treino, validação e as 8 fotos inéditas</b></summary>
+
+**Dataset anotado**
 
 ![Exemplos de imagens anotadas](frontend/docs/imagens/exemplos_anotados.jpg)
 
-**Treinamento.** As perdas caem de forma contínua, e o mAP50 passa de 0,97 já na época 10.
+**Curvas do treino:** as perdas caem e o mAP50 passa de 0,97 já na época 10.
 
 ![Curvas de perda e métricas ao longo das 30 épocas](frontend/docs/imagens/curvas_treino.jpg)
 
-**Validação.** Matriz de confusão normalizada: mostra onde estão as trocas entre as classes.
+**Matriz de confusão da validação**
 
-<img src="frontend/docs/imagens/matriz_confusao.jpg" alt="Matriz de confusão normalizada" width="560">
+<img src="frontend/docs/imagens/matriz_confusao.jpg" alt="Matriz de confusão normalizada" width="520">
 
-**Imagens inéditas.** Os 8 painéis com acerto ou erro conferidos contra o gabarito. Os 3 erros
-foram: dúvida entre boa e defeito numa fruta com cancro, uma fruta com verrugose aprovada como boa
-(doença com só 4 exemplos no dataset) e uma laranja não detectada numa foto girada, com folha por cima.
+**As 8 fotos inéditas, com acerto e erro conferidos contra o gabarito**
 
-<img src="frontend/docs/imagens/deteccoes_ineditas.jpg" alt="Painéis de inspeção nas 8 imagens inéditas" width="640">
+<img src="frontend/docs/imagens/deteccoes_ineditas.jpg" alt="Painéis de inspeção nas 8 imagens inéditas" width="600">
 
-## Riscos e próximos passos
+</details>
 
-| Risco | Mitigação |
-| --- | --- |
-| Fotos de estúdio, diferentes da esteira real | Coletar imagens na própria unidade de beneficiamento |
-| Anotação semi-automática | Revisão manual completa das caixas |
-| Doenças pouco representadas (verrugose) | Balancear o dataset por tipo de doença |
-| Fundo diferente entre as classes | Padronizar a captura e variar os fundos no treino |
-| Cópias giradas entre treino e validação | Separar a divisão pela foto de origem |
+## Próximos passos
 
-| Fase | Entrega | Critério para avançar |
+| Fase | O que é | Status |
 | --- | --- | --- |
-| 1. Prova de conceito ✅ | Modelo, regras de qualidade e relatório rastreável | Pipeline funcionando de ponta a ponta |
-| 2. Piloto de dados | 1.000+ imagens da própria linha, anotadas por tipo de doença | Recall de defeito e precision de boa medidos em imagens inéditas da linha |
-| 3. Piloto na esteira | Câmera, detecção em vídeo com rastreamento e painel por lote | Comparação com a inspeção manual no mesmo lote |
-| 4. Operação | Descarte automático e revisão humana dos casos de dúvida | Indicadores estáveis por safra |
+| 1. Prova de conceito | Modelo, regras de qualidade e relatório rastreável | ✅ Concluída |
+| 2. Piloto de dados | 1.000+ fotos da própria linha, anotadas por tipo de doença | Próxima |
+| 3. Piloto na esteira | Câmera em tempo real e painel do lote, como na simulação acima | Planejada |
+| 4. Operação | Descarte automático e revisão humana dos casos de dúvida | Planejada |
 
-## Execução local
+Antes de ir para a linha, é preciso resolver três coisas: fotografar frutas reais da esteira (o dataset
+é de estúdio), equilibrar os tipos de doença e separar treino e validação pela foto de origem.
 
-Requer Python 3.10 ou superior. Os comandos rodam de dentro de `backend/`.
+## Como rodar
+
+Precisa de Python 3.10 ou superior. Tudo roda de dentro de `backend/`.
 
 ```powershell
 cd backend
 python -m venv .venv
-.venv\Scripts\Activate.ps1            # Linux/macOS: source .venv/bin/activate
+.venv\Scripts\Activate.ps1          # Linux/macOS: source .venv/bin/activate
 python -m pip install -e ".[dev]"
 yolo checks
 ```
 
-| Etapa | Comando | Resultado |
-| --- | --- | --- |
-| Dados | `python scripts/anotar_mendeley.py "<pasta>/Orange Fruit Diseases"` | Dataset anotado em `dataset/bruto/` |
-| Preparo | `citrus-yolo preparar` | Divisão 80/20, `data.yaml` e checklist de qualidade |
-| Treino | `citrus-yolo treinar` (`--dispositivo 0` para GPU) | `modelo/best.pt`, curvas e tabela por época |
-| Validação | `citrus-yolo validar` | Métricas gerais e por classe |
-| Teste | `citrus-yolo detectar` | Painéis, CSV e acerto/erro nas inéditas |
-| Relatório | `citrus-yolo relatorio` | `resultados/relatorio/relatorio.pdf` |
-| Entrega | `citrus-yolo entregar` | ZIP final e lista de pendências |
-
-Para rodar tudo de uma vez, use `citrus-yolo tudo`. Sem GPU, há o
-[notebook do Colab](frontend/notebooks/treino_colab.ipynb). Os comandos equivalentes do Ultralytics
-estão em [`backend/comandos.txt`](backend/comandos.txt). Nos comandos `yolo` diretos, use `project=`
-com caminho absoluto; caso contrário, o Ultralytics grava fora do projeto.
-
-Testes:
-
 ```bash
-cd backend
-python -m pip install -e ".[dev]"
-ruff check .
-pytest
+citrus-yolo preparar     # valida os dados e divide 80/20
+citrus-yolo treinar      # treina e salva modelo/best.pt  (--dispositivo 0 para GPU)
+citrus-yolo validar      # precision, recall e mAP por classe
+citrus-yolo detectar     # painéis nas fotos inéditas
+citrus-yolo relatorio    # relatório em PDF
+citrus-yolo entregar     # pacote final da atividade
 ```
+
+Ou tudo de uma vez: `citrus-yolo tudo`. Sem GPU, use o [notebook do Colab](frontend/notebooks/treino_colab.ipynb).
+Para os testes, rode `ruff check .` e `pytest` (são 38 testes, que rodam sem GPU).
 
 ## Estrutura
 
 ```
-citrus-yolo-inspection/
-├── README.md
-├── backend/                  # pipeline Python
-│   ├── configs/              # projeto.yaml (regras e parâmetros) e relatorio.yaml
-│   ├── src/citrus_yolo/      # config, dataset, treino, detecção, relatório, entrega e CLI
-│   ├── scripts/              # anotação semi-automática do dataset público
-│   └── tests/                # 38 testes (rodam sem GPU)
-├── frontend/
-│   ├── apresentacao/         # relatório técnico em ABNT (.docx)
-│   ├── notebooks/            # execução no Google Colab
-│   └── docs/                 # imagens de evidência e registro do uso de IA
-└── .github/workflows/ci.yml  # lint e testes a cada push
+backend/    pipeline Python: configs, código, scripts e testes
+frontend/   relatório em ABNT, notebook do Colab, imagens e documentação
 ```
 
-Dataset, pesos treinados e resultados completos não são versionados por causa do tamanho. Eles vão
-no pacote de entrega da atividade.
+Dataset, pesos e resultados completos ficam fora do Git por causa do tamanho e vão no pacote de entrega.
 
-## Dataset e créditos
+## Créditos
 
 - **Dataset:** Doh, B. (2025). *Orange Fruit Diseases Dataset* (v1). Mendeley Data.
-  [doi:10.17632/6szsnpypdd.1](https://doi.org/10.17632/6szsnpypdd.1), licença CC BY 4.0. Tem 700 fotos
-  por diagnóstico (saudável, mancha preta, cancro, greening e verrugose). Como o arquivo não traz
-  caixas, a anotação foi semi-automática e revisada por amostragem
-  ([`backend/scripts/anotar_mendeley.py`](backend/scripts/anotar_mendeley.py)). Ficaram 240 imagens
-  equilibradas e mais 8 inéditas.
-- **Modelo base:** YOLOv8n, da [Ultralytics](https://github.com/ultralytics/ultralytics), pré-treinado no COCO.
-- **Uso de IA no desenvolvimento:** registrado em [frontend/docs/uso_de_llms.md](frontend/docs/uso_de_llms.md).
+  [doi:10.17632/6szsnpypdd.1](https://doi.org/10.17632/6szsnpypdd.1), licença CC BY 4.0.
+  Como o arquivo vem sem caixas, a anotação foi semi-automática e revisada por amostragem
+  ([script](backend/scripts/anotar_mendeley.py)).
+- **Modelo base:** YOLOv8n, da [Ultralytics](https://github.com/ultralytics/ultralytics).
+- **Uso de IA no desenvolvimento:** descrito em [frontend/docs/uso_de_llms.md](frontend/docs/uso_de_llms.md).
 
-Projeto desenvolvido como **Atividade Prática Final da disciplina de Inteligência Artificial**:
-treinamento de um modelo YOLO com dataset próprio, com no mínimo 2 classes, 60 imagens anotadas,
-20 épocas e 5 imagens inéditas.
+Projeto da **Atividade Prática Final de Inteligência Artificial**.
